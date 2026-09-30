@@ -143,6 +143,13 @@ describe("login (POST /authorize)", () => {
     expect(msg(await wrongPw.text())).toBe(msg(await unknown.text()));
   });
 
+  it("login page uses a referrer policy that keeps Origin on its own form POST", async () => {
+    const { body: client } = await registerClient();
+    const { res } = await startAuthorize(client.client_id, pkcePair().challenge);
+    // "no-referrer" makes browsers send `Origin: null`, which the same-origin check rejects.
+    expect(res.headers.get("referrer-policy")).toBe("same-origin");
+  });
+
   it("rejects missing CSRF cookie and cross-origin posts", async () => {
     const eshop = fakeEshop();
     const { body: client } = await registerClient();
