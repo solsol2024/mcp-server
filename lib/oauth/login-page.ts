@@ -72,7 +72,10 @@ function page(title: string, body: string, status: number, formAction: string[],
       "Content-Security-Policy": csp,
       "X-Frame-Options": "DENY",
       "Cache-Control": "no-store",
-      "Referrer-Policy": "no-referrer",
+      // Not "no-referrer": with it, browsers send `Origin: null` on the login form POST,
+      // which fails the same-origin check in handleAuthorizePost. "same-origin" still
+      // sends nothing to other origins (e.g. the client's callback).
+      "Referrer-Policy": "same-origin",
       ...headers,
     },
   });
