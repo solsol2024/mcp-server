@@ -1,6 +1,6 @@
 import { EndpointField } from '@/components/endpoint-field'
 
-const tools = [
+const publicTools = [
   {
     name: 'search_products',
     description:
@@ -23,15 +23,18 @@ const tools = [
     description: 'Paginated product listing for a single category.',
     args: 'category, limit, after',
   },
+]
+
+const partnerOnlyTools = [
   {
     name: 'get_price',
     description:
-      'Partner only. Your customer-specific price incl. and excl. VAT, currency, and quantity tiers.',
+      'Your customer-specific price incl. and excl. VAT, currency, and quantity tiers.',
     args: 'catalogNumber',
   },
   {
     name: 'check_availability',
-    description: 'Partner only. Availability status and stock quantities per warehouse.',
+    description: 'Availability status and stock quantities per warehouse.',
     args: 'catalogNumber',
   },
 ]
@@ -59,25 +62,33 @@ export default function Home() {
           >
             solsol.eu
           </a>{' '}
-          photovoltaic catalogue for AI assistants and agents. Sign in with a SOLSOL partner account
-          to add your customer-specific prices and stock. Read-only; ordering is not supported.
+          photovoltaic catalogue for AI assistants and agents. The authenticated endpoint adds
+          your customer-specific prices and stock once you sign in with a SOLSOL partner account.
+          Read-only; ordering is not supported.
         </p>
       </header>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-medium text-muted-foreground">Endpoint</h2>
-        <EndpointField path="/mcp" />
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          Point any MCP-compatible client at this URL. Anonymous access returns public catalogue
-          data. Clients that support OAuth can sign in with your SOLSOL partner account; your
-          password is sent to SOLSOL and is not stored.
-        </p>
+        <h2 className="text-sm font-medium text-muted-foreground">Endpoints</h2>
+        <div className="flex flex-col gap-1.5">
+          <EndpointField path="/mcp" />
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            Requires signing in with your SOLSOL partner account (OAuth). Your password is sent
+            to SOLSOL and is not stored. Includes your customer-specific prices and stock.
+          </p>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <EndpointField path="/mcp-public" />
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            No authentication. Public catalogue data only — no prices, no stock.
+          </p>
+        </div>
       </section>
 
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-medium text-muted-foreground">Tools</h2>
         <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
-          {tools.map((tool) => (
+          {publicTools.map((tool) => (
             <li key={tool.name} className="flex flex-col gap-1.5 p-4">
               <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                 <code className="font-mono text-sm font-medium text-foreground">{tool.name}</code>
@@ -86,7 +97,26 @@ export default function Home() {
               <p className="text-sm leading-relaxed text-muted-foreground">{tool.description}</p>
             </li>
           ))}
+          {partnerOnlyTools.map((tool) => (
+            <li key={tool.name} className="flex flex-col gap-1.5 p-4">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                <span className="flex items-baseline gap-2">
+                  <code className="font-mono text-sm font-medium text-foreground">{tool.name}</code>
+                  <span className="rounded-full border border-border bg-secondary px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-secondary-foreground">
+                    Partner only
+                  </span>
+                </span>
+                <span className="font-mono text-xs text-muted-foreground">{tool.args}</span>
+              </div>
+              <p className="text-sm leading-relaxed text-muted-foreground">{tool.description}</p>
+            </li>
+          ))}
         </ul>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          <code className="font-mono text-xs">search_products</code> and{' '}
+          <code className="font-mono text-xs">get_product</code> also include your price and
+          stock when called on <code className="font-mono text-xs">/mcp</code> while signed in.
+        </p>
       </section>
 
       <section className="flex flex-col gap-3">
@@ -95,13 +125,15 @@ export default function Home() {
           <div className="flex flex-col gap-0.5">
             <dt className="font-medium text-foreground">Claude (web / desktop)</dt>
             <dd className="text-muted-foreground">
-              Settings &rarr; Connectors &rarr; Add custom connector &rarr; paste the endpoint URL above.
+              Settings &rarr; Connectors &rarr; Add custom connector &rarr; paste the{' '}
+              <code className="font-mono text-xs">/mcp</code> endpoint URL above. Claude opens the
+              SOLSOL sign-in page automatically.
             </dd>
           </div>
           <div className="flex flex-col gap-0.5">
             <dt className="font-medium text-foreground">Claude Code</dt>
             <dd className="font-mono text-xs text-muted-foreground">
-              claude mcp add --transport http solsol &lt;endpoint URL&gt;
+              claude mcp add --transport http solsol &lt;/mcp endpoint URL&gt;
             </dd>
           </div>
           <div className="flex flex-col gap-0.5">

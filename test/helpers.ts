@@ -5,6 +5,7 @@ import { handleRegister } from "../lib/oauth/clients";
 import { handleAuthorizeGet, handleAuthorizePost } from "../lib/oauth/authorize";
 import { handleToken } from "../lib/oauth/tokens";
 import { POST as mcpPost } from "../app/mcp/route";
+import { POST as mcpPublicPost } from "../app/mcp-public/route";
 
 export const ORIGIN = "http://localhost";
 export const REDIRECT = "https://client.example/callback";
@@ -201,16 +202,30 @@ export async function signIn() {
   return { clientId: client.client_id as string, code, verifier, tokens: tokens.body };
 }
 
-export async function mcp(method: string, params: unknown = {}, bearer?: string) {
+async function callMcp(
+  post: (req: Request) => Promise<Response>,
+  url: string,
+  method: string,
+  params: unknown,
+  bearer?: string,
+) {
   const headers: Record<string, string> = {
     "content-type": "application/json",
     accept: "application/json, text/event-stream",
   };
   if (bearer) headers.authorization = `Bearer ${bearer}`;
-  const res = await mcpPost(
-    new Request(`${ORIGIN}/mcp`, { method: "POST", headers, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) }),
-  );
+  const res = await post(new Request(url, { method: "POST", headers, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) }));
   const text = await res.text();
   const payload = text.includes("data:") ? text.split("\n").find((l) => l.startsWith("data:"))!.slice(5).trim() : text;
   return { status: res.status, headers: res.headers, body: payload ? JSON.parse(payload) : null };
+}
+
+/** Calls the authenticated /mcp endpoint (requires a bearer token). */
+export async function mcp(method: string, params: unknown = {}, bearer?: string) {
+  return callMcp(mcpPost, `${ORIGIN}/mcp`, method, params, bearer);
+}
+
+/** Calls the anonymous /mcp-public endpoint (public catalogue only, no auth). */
+export async function mcpPublic(method: string, params: unknown = {}) {
+  return callMcp(mcpPublicPost, `${ORIGIN}/mcp-public`, method, params);
 }

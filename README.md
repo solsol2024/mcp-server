@@ -1,18 +1,27 @@
 # SOLSOL katalog – MCP server (demo)
 
-Read-only MCP server nad **veřejným katalogem solsol.eu** (bez cen a skladu – ty vidí jen přihlášení partneři).
+Read-only MCP server nad **katalogem solsol.eu**. Dva endpointy:
+
+| Endpoint | Přihlášení | Obsah |
+|---|---|---|
+| `/mcp` | **Povinné** (OAuth 2.1, partnerský účet) | Veřejný katalog + vaše ceny a sklad |
+| `/mcp-public` | Žádné | Jen veřejný katalog (bez cen a skladu) |
+
 Data čte z GraphQL API, které používá samotný eshop (`https://solsol.eu/graphql/`), takže jsou vždy aktuální.
 
 ## Nástroje
 
-| Nástroj | Popis |
-|---|---|
-| `search_products` | Fulltext (název, model, značka, katalogové číslo) |
-| `get_product` | Detail: popis, technické parametry, obrázky, dokumenty (datasheet, manuály). Vstup: kat. číslo / slug / URL |
-| `list_categories` | Strom kategorií |
-| `browse_category` | Produkty kategorie se stránkováním (`after` = `nextCursor`) |
+| Nástroj | Endpoint | Popis |
+|---|---|---|
+| `search_products` | oba | Fulltext (název, model, značka, katalogové číslo). Na `/mcp` přihlášeně navíc vaše cena a sklad |
+| `get_product` | oba | Detail: popis, technické parametry, obrázky, dokumenty (datasheet, manuály). Vstup: kat. číslo / slug / URL. Na `/mcp` přihlášeně navíc vaše cena a sklad |
+| `list_categories` | oba | Strom kategorií |
+| `browse_category` | oba | Produkty kategorie se stránkováním (`after` = `nextCursor`) |
+| `get_price` | jen `/mcp` | Vaše cena s DPH / bez DPH, DPH, měna, množstevní ceny. Vstup: katalogové číslo |
+| `check_availability` | jen `/mcp` | Stav dostupnosti a množství skladem (celkem i po skladech). Vstup: katalogové číslo |
 
-Bez přihlášení žádný nástroj nikdy nevyžádá cenu, sklad ani dostupnost (hlídá to test). Partnerské nástroje – viz níže.
+`/mcp-public` nikdy nevyžádá cenu, sklad ani dostupnost (hlídá to test) a ignoruje i případný Bearer token.
+`/mcp` bez platného tokenu vždy vrátí `401` s `WWW-Authenticate` odkazujícím na `/.well-known/oauth-protected-resource` – žádný nástroj tam není dostupný anonymně.
 
 ## Nasazení na Vercel (2 minuty)
 
@@ -25,14 +34,16 @@ npx vercel --prod # produkční URL
 
 **B) GitHub** – nahrát složku do repozitáře → vercel.com → *Add New Project* → Import. Pro přihlášení partnerů nastavte proměnné prostředí (viz níže).
 
-Výsledný endpoint: `https://<projekt>.vercel.app/mcp`
+Výsledné endpointy: `https://<projekt>.vercel.app/mcp` (přihlášení partnera) a
+`https://<projekt>.vercel.app/mcp-public` (bez přihlášení).
 
 > Pozor: pokud je u projektu zapnutá *Deployment Protection* (Vercel Authentication), Claude se k endpointu nepřipojí. Pro demo ji vypněte.
 > Hobby plán je jen pro nekomerční použití – pro firemní nasazení použijte Pro.
+> Pro `/mcp` je nutné nastavit `MCP_TOKEN_ENCRYPTION_KEY` a Redis (viz „Přihlášení partnera“ níže) – bez nich endpoint OAuth metadata nenačte a přihlášení nebude fungovat.
 
 ## Připojení klienta
 
-- **Claude (web/desktop)**: Settings → Connectors → *Add custom connector* → URL `https://<projekt>.vercel.app/mcp` (přihlášení partnera – viz níže).
+- **Claude (web/desktop)**: Settings → Connectors → *Add custom connector* → URL `https://<projekt>.vercel.app/mcp` → Claude vás automaticky přihlásí (viz níže). Pro anonymní přístup použijte `/mcp-public`.
 - **Claude Code**: `claude mcp add --transport http solsol https://<projekt>.vercel.app/mcp`
 - **Test**: `npx @modelcontextprotocol/inspector` → Streamable HTTP → URL výše.
 
@@ -40,8 +51,8 @@ Výsledný endpoint: `https://<projekt>.vercel.app/mcp`
 
 ```bash
 npm i
-npm run dev      # http://localhost:3000/mcp
-npm test         # 39 testů (klient eshopu, MCP protokol, OAuth vrstva – eshop vždy mockovaný)
+npm run dev      # http://localhost:3000/mcp (přihlášení) a /mcp-public (bez přihlášení)
+npm test         # 41 testů (klient eshopu, MCP protokol, OAuth vrstva – eshop vždy mockovaný)
 npm run typecheck
 ```
 
@@ -51,16 +62,18 @@ Volitelné proměnné: `SOLSOL_GRAPHQL_URL`, `SOLSOL_SITE_URL` (např. pro testo
 
 - `lib/solsol.ts` – jediné místo, které zná eshop (GraphQL dotazy + mapování). Výměna za jiný zdroj / přihlášený přístup se dělá tady.
 - `lib/tools.ts` – definice MCP nástrojů.
-- `app/mcp/route.ts` – HTTP endpoint (`mcp-handler`, stateless Streamable HTTP, `withMcpAuth`).
+- `app/mcp/route.ts` – přihlašovaný endpoint (`mcp-handler`, `withMcpAuth({ required: true })` – bez platného tokenu vrátí `401` dřív, než se zavolá jakýkoli nástroj).
+- `app/mcp-public/route.ts` – anonymní endpoint, jen veřejné nástroje, žádné `withMcpAuth`.
 - `lib/eshop.ts` – přihlášený klient eshopu (login, `X-Auth-Token`, 401 → refresh → opakování); `lib/partner.ts` – ceny a sklad.
 - `lib/oauth/*` – OAuth 2.1 server (`/authorize`, `/token`, `/register`, `/logout`, metadata), šifrované uložení tokenů v Redis.
 - Odpovědi eshopu se na Vercelu cachují 5 minut.
 
 ## Přihlášení partnera (OAuth) – ceny a dostupnost
 
-Server je zároveň vlastním **OAuth 2.1 autorizačním serverem**, který přemosťuje přihlášení do eshopu
-(eshop sám OAuth nepodporuje, jen e-mail + heslo). Bez přihlášení funguje vše jako dřív (veřejný katalog).
-Po přihlášení navíc:
+`/mcp` je zároveň vlastním **OAuth 2.1 autorizačním serverem**, který přemosťuje přihlášení do eshopu
+(eshop sám OAuth nepodporuje, jen e-mail + heslo), a je na něm **vyžadováno přihlášení** – bez platného
+tokenu vrátí `401` dřív, než je vidět jakýkoli nástroj. Pro anonymní přístup k veřejnému katalogu bez
+přihlášení použijte `/mcp-public`. Po přihlášení na `/mcp` navíc:
 
 | Nástroj | Popis |
 |---|---|
@@ -72,9 +85,10 @@ Pouze čtení – objednávat nelze.
 
 ### Jak přihlášení funguje
 
-1. Klient (Claude) zavolá `/mcp`, dostane `401` s odkazem na `/.well-known/oauth-protected-resource`
-   a `/.well-known/oauth-authorization-server`, zaregistruje se (`/register`, Dynamic Client Registration,
-   nebo Client ID Metadata Document) a otevře `/authorize` s PKCE (S256 povinně).
+1. Klient (Claude) zavolá `/mcp` (i bez jakéhokoli úmyslu se přihlásit), vždy dostane `401` s odkazem na
+   `/.well-known/oauth-protected-resource` a `/.well-known/oauth-authorization-server`, zaregistruje se
+   (`/register`, Dynamic Client Registration, nebo Client ID Metadata Document) a otevře `/authorize`
+   s PKCE (S256 povinně).
 2. `/authorize` zobrazí přihlašovací formulář **na doméně tohoto serveru**. Heslo se jednou pošle do eshopu
    (`LoginMutation`) a **nikde se neukládá**.
 3. Uloží se jen tokeny eshopu – šifrované AES-256-GCM (`MCP_TOKEN_ENCRYPTION_KEY`) v Upstash Redis s TTL.
@@ -123,4 +137,4 @@ anonymní režim a rate limit.
 ## Omezení
 
 - GraphQL API eshopu je určené pro jeho vlastní frontend, ne jako oficiální partnerské API; schéma se může změnit.
-- Nepřihlášení uživatelé vidí jen veřejná data; ceny a sklad až po přihlášení partnerským účtem.
+- `/mcp` vyžaduje přihlášení partnerským účtem; pro veřejná data bez cen a skladu bez přihlášení použijte `/mcp-public`.

@@ -7,6 +7,7 @@ import {
   EMAIL,
   fakeEshop,
   mcp,
+  mcpPublic,
   ORIGIN,
   PASSWORD,
   pkcePair,
@@ -217,10 +218,10 @@ describe("POST /token", () => {
   });
 });
 
-describe("/mcp with and without auth", () => {
-  it("anonymous fallback: public tools only, no eshop auth headers", async () => {
+describe("/mcp-public (anonymous)", () => {
+  it("serves public tools only, no eshop auth headers, and ignores bearer tokens", async () => {
     const eshop = fakeEshop();
-    const list = await mcp("tools/list");
+    const list = await mcpPublic("tools/list");
     expect(list.status).toBe(200);
     expect(list.body.result.tools.map((t: any) => t.name).sort()).toEqual([
       "browse_category",
@@ -228,15 +229,38 @@ describe("/mcp with and without auth", () => {
       "list_categories",
       "search_products",
     ]);
-    await mcp("tools/call", { name: "search_products", arguments: { query: "wit" } });
+    await mcpPublic("tools/call", { name: "search_products", arguments: { query: "wit" } });
     expect(eshop.anonymousCalls).toBe(1);
     expect(eshop.authedCalls).toHaveLength(0);
+  });
+});
+
+describe("/mcp (authentication required)", () => {
+  it("rejects requests with no bearer token: 401 with a resource_metadata challenge", async () => {
+    const res = await mcp("tools/list");
+    expect(res.status).toBe(401);
+    expect(res.headers.get("www-authenticate")).toContain("resource_metadata=");
   });
 
   it("an invalid bearer token gets 401 with a resource_metadata challenge", async () => {
     const res = await mcp("tools/list", {}, "not-a-real-token");
     expect(res.status).toBe(401);
     expect(res.headers.get("www-authenticate")).toContain("resource_metadata=");
+  });
+
+  it("a valid bearer token gets 200 with the full partner tool set", async () => {
+    fakeEshop();
+    const { tokens } = await signIn();
+    const res = await mcp("tools/list", {}, tokens.access_token);
+    expect(res.status).toBe(200);
+    expect(res.body.result.tools.map((t: any) => t.name).sort()).toEqual([
+      "browse_category",
+      "check_availability",
+      "get_price",
+      "get_product",
+      "list_categories",
+      "search_products",
+    ]);
   });
 
   it("authenticated callers get get_price / check_availability using X-Auth-Token", async () => {

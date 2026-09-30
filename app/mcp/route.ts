@@ -8,12 +8,9 @@ export const maxDuration = 30;
 
 const serverInfo = { name: "solsol-catalogue", version: "0.2.0" };
 
-const publicHandler = createMcpHandler(registerTools, {
-  serverInfo,
-  instructions:
-    "Read-only access to the public SOLSOL (solsol.eu) photovoltaic catalogue. Prices and stock are only visible after signing in with a SOLSOL partner account (OAuth).",
-});
-
+// Authenticated endpoint only: withMcpAuth(required: true) below rejects every request that
+// doesn't carry a valid SOLSOL partner token, so every server created here can assume req.auth.
+// Anonymous callers should use /mcp-public instead.
 const partnerHandler = createMcpHandler(
   (server) => {
     registerTools(server);
@@ -22,7 +19,7 @@ const partnerHandler = createMcpHandler(
   {
     serverInfo,
     instructions:
-      "Read-only access to the SOLSOL (solsol.eu) photovoltaic catalogue as the signed-in partner: search_products and get_product include customer-specific prices and availability; get_price and check_availability return price tiers and stock. Ordering is not supported.",
+      "Read-only access to the SOLSOL (solsol.eu) photovoltaic catalogue as the signed-in partner: search_products and get_product include customer-specific prices and availability; get_price and check_availability return price tiers and stock. Ordering is not supported. This endpoint requires signing in with a SOLSOL partner account (OAuth) — anonymous callers should use /mcp-public instead.",
   },
 );
 
@@ -38,7 +35,6 @@ function sessionExpired(req: Request) {
 }
 
 async function route(req: Request): Promise<Response> {
-  if (!req.auth) return publicHandler(req);
   if (req.method !== "POST") return partnerHandler(req);
 
   // Stateless POSTs complete within the request, so buffer the body: if a tool discovered that the
@@ -50,8 +46,11 @@ async function route(req: Request): Promise<Response> {
   return new Response(body, { status: res.status, statusText: res.statusText, headers: res.headers });
 }
 
+// required: true -> requests without a valid bearer token never reach `route`; withMcpAuth answers
+// 401 itself with a WWW-Authenticate header pointing at /.well-known/oauth-protected-resource
+// (resource_metadata), which is how MCP clients discover and start the OAuth flow.
 const handler = withMcpAuth(route, verifyAccessToken, {
-  required: false,
+  required: true,
   resourceUrl: process.env.MCP_PUBLIC_URL?.replace(/\/+$/, "") || undefined,
 });
 

@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
-import { POST } from "../app/mcp/route";
+import { POST } from "../app/mcp-public/route";
 
 const fx = (n: string) => readFileSync(new URL(`./fixtures/${n}.json`, import.meta.url), "utf8");
 
 afterEach(() => vi.unstubAllGlobals());
 
 async function rpc(method: string, params: unknown = {}, id = 1) {
-  const req = new Request("http://localhost/mcp", {
+  const req = new Request("http://localhost/mcp-public", {
     method: "POST",
     headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
     body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
@@ -21,7 +21,7 @@ async function rpc(method: string, params: unknown = {}, id = 1) {
   return { status: res.status, body: JSON.parse(payload) };
 }
 
-describe("MCP endpoint (real handler, mocked eshop)", () => {
+describe("MCP public endpoint (real handler, anonymous, mocked eshop)", () => {
   it("lists the four tools, all read-only", async () => {
     const { body } = await rpc("tools/list");
     const tools = body.result.tools as { name: string; annotations?: { readOnlyHint?: boolean } }[];
