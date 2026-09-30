@@ -1,5 +1,5 @@
 import { EshopUnavailableError, InvalidCredentialsError, eshopLogin } from "../eshop";
-import { getClient } from "./clients";
+import { getClient, redirectUriMatches } from "./clients";
 import { issuer, resourceUrl, SCOPE, TTL } from "./config";
 import { ConfigError, PKCE_CHALLENGE_RE, randomToken, safeEqual, sha256 } from "./crypto";
 import { renderErrorPage, renderLoginPage, type LoginView } from "./login-page";
@@ -64,7 +64,7 @@ export async function handleAuthorizeGet(req: Request): Promise<Response> {
   // Until client_id + redirect_uri are verified we must never redirect (open-redirect protection).
   const client = clientId ? await getClient(clientId) : null;
   if (!client) return renderErrorPage(400, "Neznámá aplikace (client_id). / Unknown client.");
-  if (!redirectUri || !client.redirect_uris.includes(redirectUri)) {
+  if (!redirectUri || !redirectUriMatches(redirectUri, client.redirect_uris)) {
     return renderErrorPage(400, "redirect_uri neodpovídá registraci aplikace. / redirect_uri does not match the registered value.");
   }
 
