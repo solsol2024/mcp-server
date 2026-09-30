@@ -23,8 +23,24 @@ const partnerHandler = createMcpHandler(
   },
 );
 
+function resourceMetadataUrl(req: Request) {
+  return `${process.env.MCP_PUBLIC_URL?.replace(/\/+$/, "") || getPublicOrigin(req)}/.well-known/oauth-protected-resource`;
+}
+
+/**
+ * No Authorization header at all: per RFC 6750 §3, this is a plain "credentials were not provided"
+ * case, not an invalid/expired token, so the challenge carries no `error`/`error_description` — only
+ * `resource_metadata`, which is what MCP clients use to discover and start the OAuth flow.
+ */
+function noAuthorizationProvided(req: Request) {
+  return new Response(null, {
+    status: 401,
+    headers: { "WWW-Authenticate": `Bearer resource_metadata="${resourceMetadataUrl(req)}"` },
+  });
+}
+
 function sessionExpired(req: Request) {
-  const metadata = `${process.env.MCP_PUBLIC_URL?.replace(/\/+$/, "") || getPublicOrigin(req)}/.well-known/oauth-protected-resource`;
+  const metadata = resourceMetadataUrl(req);
   return new Response(JSON.stringify({ error: "invalid_token", error_description: "The SOLSOL session has expired" }), {
     status: 401,
     headers: {
@@ -47,11 +63,19 @@ async function route(req: Request): Promise<Response> {
 }
 
 // required: true -> requests without a valid bearer token never reach `route`; withMcpAuth answers
-// 401 itself with a WWW-Authenticate header pointing at /.well-known/oauth-protected-resource
-// (resource_metadata), which is how MCP clients discover and start the OAuth flow.
-const handler = withMcpAuth(route, verifyAccessToken, {
+// 401 itself. But it labels every such 401 as error="invalid_token", including when no token was
+// presented at all — so a missing Authorization header is intercepted here and answered directly,
+// before withMcpAuth runs, with a bare `resource_metadata` challenge and no `error`. A header that
+// is present but wrong/expired still falls through to withMcpAuth, which correctly reports
+// error="invalid_token".
+const authenticated = withMcpAuth(route, verifyAccessToken, {
   required: true,
   resourceUrl: process.env.MCP_PUBLIC_URL?.replace(/\/+$/, "") || undefined,
 });
+
+async function handler(req: Request): Promise<Response> {
+  if (!req.headers.get("authorization")) return noAuthorizationProvided(req);
+  return authenticated(req);
+}
 
 export { handler as GET, handler as POST, handler as DELETE };

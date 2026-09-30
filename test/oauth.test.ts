@@ -236,16 +236,21 @@ describe("/mcp-public (anonymous)", () => {
 });
 
 describe("/mcp (authentication required)", () => {
-  it("rejects requests with no bearer token: 401 with a resource_metadata challenge", async () => {
+  it("with no Authorization header: 401, resource_metadata only, no error/error_description (RFC 6750 §3)", async () => {
     const res = await mcp("tools/list");
     expect(res.status).toBe(401);
-    expect(res.headers.get("www-authenticate")).toContain("resource_metadata=");
+    const challenge = res.headers.get("www-authenticate");
+    expect(challenge).toMatch(/^Bearer resource_metadata="[^"]+\/\.well-known\/oauth-protected-resource"$/);
+    expect(challenge).not.toContain("error=");
+    expect(challenge).not.toContain("error_description=");
   });
 
-  it("an invalid bearer token gets 401 with a resource_metadata challenge", async () => {
+  it("with an invalid bearer token: 401, error=\"invalid_token\" plus resource_metadata", async () => {
     const res = await mcp("tools/list", {}, "not-a-real-token");
     expect(res.status).toBe(401);
-    expect(res.headers.get("www-authenticate")).toContain("resource_metadata=");
+    const challenge = res.headers.get("www-authenticate");
+    expect(challenge).toContain('error="invalid_token"');
+    expect(challenge).toContain("resource_metadata=");
   });
 
   it("a valid bearer token gets 200 with the full partner tool set", async () => {
