@@ -1,9 +1,11 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
+import { withPartnerSession } from "./oauth/session";
+import { partnerGetProduct, partnerSearch } from "./partner";
 import { browseCategory, getProduct, listCategories, searchProducts, SolsolError } from "./solsol";
 
 const NOTE =
-  "Public catalogue data only (anonymous eshop view): prices, stock and availability are not included.";
+  "Anonymous callers get public catalogue data only (no prices, stock or availability). When signed in with a SOLSOL partner account, search_products and get_product also include customer-specific prices and availability.";
 
 const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true };
 
@@ -36,7 +38,12 @@ export function registerTools(server: McpServer) {
       }),
       annotations: READ_ONLY,
     },
-    ({ query, limit }) => run(() => searchProducts(query, limit)),
+    ({ query, limit }, ctx) => {
+      const auth = ctx.http?.authInfo;
+      return run(() =>
+        auth ? withPartnerSession(auth, (store) => partnerSearch(store, query, limit)) : searchProducts(query, limit),
+      );
+    },
   );
 
   server.registerTool(
@@ -49,9 +56,12 @@ export function registerTools(server: McpServer) {
       }),
       annotations: READ_ONLY,
     },
-    ({ identifier }) =>
+    ({ identifier }, ctx) =>
       run(async () => {
-        const p = await getProduct(identifier);
+        const auth = ctx.http?.authInfo;
+        const p = auth
+          ? await withPartnerSession(auth, (store) => partnerGetProduct(store, identifier))
+          : await getProduct(identifier);
         if (!p) throw new SolsolError(`No product found for "${identifier}". Try search_products first.`);
         return p;
       }),

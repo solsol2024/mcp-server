@@ -10,7 +10,7 @@
 
 export const GRAPHQL_URL = process.env.SOLSOL_GRAPHQL_URL ?? "https://solsol.eu/graphql/";
 export const SITE_URL = (process.env.SOLSOL_SITE_URL ?? "https://solsol.eu").replace(/\/$/, "");
-const SEARCH_USER_ID = "00000000-0000-4000-8000-000000000000";
+export const SEARCH_USER_ID = "00000000-0000-4000-8000-000000000000";
 
 export class SolsolError extends Error {}
 
@@ -101,7 +101,7 @@ export interface Category {
 
 // ---------- raw GraphQL shapes ----------
 
-interface RawSummary {
+export interface RawSummary {
   name: string;
   fullName?: string;
   slug: string;
@@ -111,7 +111,7 @@ interface RawSummary {
   mainImage: { url: string } | null;
 }
 
-const SUMMARY_FIELDS = "name fullName slug catalogNumber brand{name} categories{name} mainImage{url}";
+export const SUMMARY_FIELDS = "name fullName slug catalogNumber brand{name} categories{name} mainImage{url}";
 
 export function mapSummary(p: RawSummary): ProductSummary {
   return {
@@ -142,7 +142,7 @@ export async function searchProducts(query: string, limit = 10) {
   };
 }
 
-interface RawProduct extends RawSummary {
+export interface RawProduct extends RawSummary {
   ean: string | null;
   breadcrumb: { name: string }[];
   description: string | null;
@@ -152,7 +152,7 @@ interface RawProduct extends RawSummary {
   parameters: { name: string; visible: boolean; unit: { name: string } | null; values: { text: string }[] }[];
 }
 
-const PRODUCT_FIELDS = `${SUMMARY_FIELDS} ean breadcrumb{name} description flags{name} images{url} files{anchorText url} parameters{name visible unit{name} values{text}}`;
+export const PRODUCT_FIELDS = `${SUMMARY_FIELDS} ean breadcrumb{name} description flags{name} images{url} files{anchorText url} parameters{name visible unit{name} values{text}}`;
 
 export function mapProduct(p: RawProduct): ProductDetail {
   const parameters: Record<string, string> = {};

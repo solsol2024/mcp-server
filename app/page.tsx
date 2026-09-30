@@ -23,6 +23,17 @@ const tools = [
     description: 'Paginated product listing for a single category.',
     args: 'category, limit, after',
   },
+  {
+    name: 'get_price',
+    description:
+      'Partner only. Your customer-specific price incl. and excl. VAT, currency, and quantity tiers.',
+    args: 'catalogNumber',
+  },
+  {
+    name: 'check_availability',
+    description: 'Partner only. Availability status and stock quantities per warehouse.',
+    args: 'catalogNumber',
+  },
 ]
 
 export default function Home() {
@@ -48,8 +59,8 @@ export default function Home() {
           >
             solsol.eu
           </a>{' '}
-          photovoltaic catalogue for AI assistants and agents. Prices and stock are only visible to
-          logged-in partners and are never exposed here.
+          photovoltaic catalogue for AI assistants and agents. Sign in with a SOLSOL partner account
+          to add your customer-specific prices and stock. Read-only; ordering is not supported.
         </p>
       </header>
 
@@ -57,8 +68,9 @@ export default function Home() {
         <h2 className="text-sm font-medium text-muted-foreground">Endpoint</h2>
         <EndpointField path="/mcp" />
         <p className="text-sm leading-relaxed text-muted-foreground">
-          Point any MCP-compatible client at this URL. No authentication is required — the server
-          only returns data that is already public on the storefront.
+          Point any MCP-compatible client at this URL. Anonymous access returns public catalogue
+          data. Clients that support OAuth can sign in with your SOLSOL partner account; your
+          password is sent to SOLSOL and is not stored.
         </p>
       </section>
 
@@ -102,8 +114,7 @@ export default function Home() {
       </section>
 
       <footer className="border-t border-border pt-6 text-xs text-muted-foreground">
-        Demo server. Anonymous access only — for sustained production use, add rate limiting and a
-        token.
+        OAuth 2.1 with PKCE. Sign out at any time by disconnecting the connector in your client.
       </footer>
     </main>
   )
