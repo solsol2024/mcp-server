@@ -28,6 +28,23 @@ export function isAllowedRedirectUri(uri: unknown): uri is string {
   return u.protocol === "http:" && LOOPBACK_HOSTS.has(u.hostname);
 }
 
+/**
+ * Does a requested redirect_uri match one of the client's registered URIs?
+ * Exact match, except that loopback http URIs ignore the port (RFC 8252 §7.3):
+ * native / CLI clients pick a free port at runtime.
+ */
+export function redirectUriMatches(requested: string, registered: string[]): boolean {
+  if (registered.includes(requested)) return true;
+  if (!isAllowedRedirectUri(requested)) return false;
+  const req = new URL(requested);
+  if (req.protocol !== "http:" || !LOOPBACK_HOSTS.has(req.hostname)) return false;
+  return registered.some((uri) => {
+    if (!isAllowedRedirectUri(uri)) return false;
+    const reg = new URL(uri);
+    return reg.protocol === "http:" && reg.hostname === req.hostname && reg.pathname === req.pathname && reg.search === req.search;
+  });
+}
+
 const isMetadataDocumentUrl = (clientId: string) => clientId.startsWith("https://");
 
 const cleanName = (name: unknown) =>

@@ -71,6 +71,24 @@ describe("client registration and /authorize validation", () => {
     expect(html).toContain("redirect_uri");
   });
 
+  it("loopback redirect_uri matches on any port (RFC 8252 §7.3), other parts must still match", async () => {
+    const { body: client } = await registerClient(["http://localhost/callback", "http://127.0.0.1:3118/callback"]);
+    const status = async (redirect_uri: string) =>
+      (await startAuthorize(client.client_id, pkcePair().challenge, { redirect_uri })).res.status;
+    expect(await status("http://localhost:8765/callback")).toBe(200);
+    expect(await status("http://localhost/callback")).toBe(200);
+    expect(await status("http://127.0.0.1:54321/callback")).toBe(200);
+    expect(await status("http://localhost:8765/other")).toBe(400);
+    expect(await status("http://127.0.0.1:8765/callback?x=1")).toBe(400);
+    expect(await status("http://[::1]:8765/callback")).toBe(400);
+  });
+
+  it("https redirect_uri still requires an exact match, port included", async () => {
+    const { body: client } = await registerClient(["https://a.example/cb"]);
+    const { res } = await startAuthorize(client.client_id, pkcePair().challenge, { redirect_uri: "https://a.example:8443/cb" });
+    expect(res.status).toBe(400);
+  });
+
   it("requires PKCE S256", async () => {
     const { body: client } = await registerClient();
     const { res } = await startAuthorize(client.client_id, pkcePair().challenge, { code_challenge_method: "plain" });
