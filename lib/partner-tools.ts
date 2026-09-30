@@ -44,7 +44,7 @@ export function registerPartnerTools(server: McpServer) {
     {
       title: "Check availability",
       description:
-        "Availability status and stock quantities (total and per warehouse) for a product, as visible to your SOLSOL partner account.",
+        "Stock for a product, as visible to your SOLSOL partner account. Only stock.inStockNow (CZ warehouse) is physically in stock and ready to ship. stock.arrivingWithin7Days (NL) and stock.arrivingIn14DaysOrMore (CESTA, on the way) are not in stock yet. When asked about stock, report all three figures separately; never present totalIncludingIncoming as the in-stock quantity.",
       inputSchema: z.object({ catalogNumber }),
       annotations: READ_ONLY,
     },

@@ -54,11 +54,29 @@ export function mapPricing(p: RawCommercial) {
   };
 }
 
+/**
+ * What each eshop stock location means for the partner. Only CZ is physically in stock;
+ * the eshop's own stockQuantity also counts goods that are still on their way.
+ */
+const WAREHOUSES: Record<string, { key: "inStockNow" | "arrivingWithin7Days" | "arrivingIn14DaysOrMore"; meaning: string }> = {
+  CZ: { key: "inStockNow", meaning: "In stock now (CZ warehouse), ready to ship" },
+  NL: { key: "arrivingWithin7Days", meaning: "Not in stock yet, expected within 7 days (NL warehouse)" },
+  CESTA: { key: "arrivingIn14DaysOrMore", meaning: "Not in stock yet, on the way, expected in 14 days or more" },
+};
+
 export function mapAvailability(p: RawCommercial) {
+  const stock = { inStockNow: 0, arrivingWithin7Days: 0, arrivingIn14DaysOrMore: 0 };
+  const stockByWarehouse = (p.stockQuantities ?? []).map((s) => {
+    const known = WAREHOUSES[s.name.trim().toUpperCase()];
+    if (known) stock[known.key] += s.quantity;
+    return { warehouse: s.name, quantity: s.quantity, meaning: known?.meaning ?? "Unknown stock location, not counted as in stock" };
+  });
   return {
     availability: p.availability ? { name: p.availability.name, status: p.availability.status } : null,
-    stockQuantity: p.stockQuantity ?? null,
-    stockByWarehouse: (p.stockQuantities ?? []).map((s) => ({ warehouse: s.name, quantity: s.quantity })),
+    stock,
+    stockByWarehouse,
+    // The eshop's own total, which includes stock that has not arrived yet. Use stock.inStockNow for "in stock".
+    totalIncludingIncoming: p.stockQuantity ?? null,
   };
 }
 

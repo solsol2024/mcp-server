@@ -307,7 +307,11 @@ describe("/mcp (authentication required)", () => {
       quantityPrices: [{ minQuantity: 1 }, { minQuantity: 5, withoutVat: "95000.00" }],
     });
     const stock = await mcp("tools/call", { name: "check_availability", arguments: { catalogNumber: "209504" } }, tokens.access_token);
-    expect(toolText(stock.body)).toMatchObject({ availability: { status: "InStock" }, stockQuantity: 12 });
+    expect(toolText(stock.body)).toMatchObject({
+      availability: { status: "InStock" },
+      stock: { inStockNow: 162, arrivingWithin7Days: 0, arrivingIn14DaysOrMore: 200 },
+      totalIncludingIncoming: 362,
+    });
 
     const search = await mcp("tools/call", { name: "search_products", arguments: { query: "wit" } }, tokens.access_token);
     expect(toolText(search.body).products[0].price.withoutVat).toBe("100000.00");

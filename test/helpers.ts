@@ -45,8 +45,12 @@ const authedProduct = {
     { priceWithVat: "114950.00", priceWithoutVat: "95000.00", currencyCode: "CZK", minQuantity: 5 },
   ],
   availability: { name: "Skladem", status: "InStock" },
-  stockQuantity: 12,
-  stockQuantities: [{ name: "Praha", quantity: 12 }],
+  stockQuantity: 362,
+  stockQuantities: [
+    { name: "CZ", quantity: 162 },
+    { name: "NL", quantity: 0 },
+    { name: "CESTA", quantity: 200 },
+  ],
 };
 
 /**

@@ -5,7 +5,7 @@ import { partnerGetProduct, partnerSearch } from "./partner";
 import { browseCategory, getProduct, listCategories, searchProducts, SolsolError } from "./solsol";
 
 const NOTE =
-  "Anonymous callers get public catalogue data only (no prices, stock or availability). When signed in with a SOLSOL partner account, search_products and get_product also include customer-specific prices and availability.";
+  "Anonymous callers get public catalogue data only (no prices, stock or availability). When signed in with a SOLSOL partner account, search_products and get_product also include customer-specific prices and availability; for stock, only stock.inStockNow is in stock now, the other stock figures are still arriving (see check_availability).";
 
 const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true };
 
